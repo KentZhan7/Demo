@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<configuration scan="false" scanPeriod="60000" debug="false">
+
+	<property name="FILE_HOME" value="C:/demo/logs" />
+	<property name="PATTERN1" value="%d{yyyy-MM-dd HH:mm:ss.SSS}[%t][%-5level]-%C - %msg %n" />
+	<!-- 設定日期格式 -->
+	<timestamp key="byDate" datePattern="yyyyMMdd" />
+	<!-- 設定ConsoleAppender -->
+	<appender name="consoleAppender" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<Pattern>${PATTERN1}</Pattern>
+		</encoder>
+<!-- 		<filter class="ch.qos.logback.classic.filter.ThresholdFilter"> -->
+<!-- 			<level>INFO</level> -->
+<!-- 			<onMatch>ACCEPT</onMatch> -->
+<!-- 			<onMismatch>DENY</onMismatch> -->
+<!-- 		</filter> -->
+	</appender>
+	<!--設定 FileAppender -->
+	<appender name="FileAppender" class="ch.qos.logback.core.FileAppender">
+		<File>${FILE_HOME}/demo.log.${byDate}</File>
+		<encoder>
+			<Pattern>${PATTERN1}</Pattern>
+		</encoder>
+		<append>true</append>
+		<prudent>false</prudent>
+	</appender>
+
+	<!-- 異步輸出 -->
+	<appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+		<!-- 不丟失日誌.默認的,如果隊列的80%已滿,則會丟棄TRACT、DEBUG、INFO級別的日誌 -->
+		<discardingThreshold>0</discardingThreshold>
+		<!-- 更改默認的隊列的深度,該值會影響性能.默認值為256 -->
+		<queueSize>256</queueSize>
+		<!-- 添加附加的appender,最多只能添加一個 -->
+		<appender-ref ref="FileAppender" />
+	</appender>
+
+	<logger name="com.demo.controller" level="INFO" additivity="false">
+		<appender-ref ref="consoleAppender" />
+		<appender-ref ref="ASYNC" />
+	</logger>
+	
+	<logger name="com.demo.interceptors" level="INFO" additivity="false">
+		<appender-ref ref="consoleAppender" />
+		<appender-ref ref="ASYNC" />
+	</logger>
+	
+	<logger name="com.demo.task" level="INFO" additivity="false">
+		<appender-ref ref="consoleAppender" />
+		<appender-ref ref="ASYNC" />
+	</logger>
+	
+	<root level="INFO">
+		<appender-ref ref="FileAppender" />
+		<appender-ref ref="consoleAppender" />
+	</root>
+
+</configuration>

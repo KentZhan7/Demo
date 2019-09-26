@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link href="/webjars/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+		<script src="/webjars/sockjs-client/sockjs.min.js"></script>
+	    <script src="/webjars/stomp-websocket/stomp.min.js"></script>
+	    <script src="https://gist.github.com/whoahbot/98973.js"></script>
+		<title>Demo</title>
+		<style type="text/css">
+			#overflowDiv {
+				height:350px !important;
+				overflow:auto !important;  
+				margin-top:20px !important;
+			}
+			
+			.redtext {
+				color: red;
+			}
+		</style>
+		<script>
+			if (!('Notification' in window)) {
+			  console.log('This browser does not support notification');
+			}
+			
+			if (Notification.permission === 'default' || Notification.permission === 'undefined') {
+				Notification.requestPermission(function(permission) {
+					// permission 可為「granted」（同意）、「denied」（拒絕）和「default」（未授權）
+					// 在這裡可針對使用者的授權做處理
+				});
+			}
+
+			var stompClient = null;
+			function setConnected(connected) {
+				$("#connect").prop("disabled", connected); //將id = connect 按鈕屬性改為disabled
+				$("#disconnect").prop("disabled", !connected); //將id = disconnect 按鈕屬性改為disabled
+				if (connected) {
+					$("#conversation").show(); //當連接上Websocket id = conversation 顯示
+				} else {
+					$("#conversation").hide(); // 將 conversation隱藏
+				}
+				$("#chatRoom").html(""); //將chatRoom內容清空
+			}
+			//連結WebSocket方法
+			function connect() {
+
+				// 				192.168.16.125
+				// 			    var socket = new SockJS('http://172.24.66.37:8083/endpointChatRoom'); //建立一個socket物件 名稱為:/endpointChatRoom
+				var socket = new SockJS('http://localhost:8083/endpointChatRoom?aaaa=' + $("#userName").val()); //建立一個socket物件 名稱為:/endpointChatRoom
+// 				var socket = new SockJS('http://192.168.16.125:8083/endpointChatRoom?aaaa=' + $("#userName").val()); //建立一個socket物件 名稱為:/endpointChatRoom
+				stompClient = Stomp.over(socket);
+				stompClient.connect({
+					'user' : $("#userName").val()
+				}, function(frame) {
+					setConnected(true);
+					console.log('Connected: ' + frame);
+					// 接收廣播
+					stompClient.subscribe('/topic/getResponse', function(
+							response) {
+						showAnnouncement(JSON.parse(response.body));
+					});
+
+					// 接受一對一
+					stompClient.subscribe('/user/' + $("#channel").val()
+							+ '/message', function(response) {
+						console.log(JSON.parse(response.body));
+						showConversation(JSON.parse(response.body)); //
+					});
+
+					$("#send").prop("disabled", false);
+				});
+			}
+
+			//關閉WebSocket方法
+			function disconnect() {
+				if (stompClient !== null) {
+					stompClient.disconnect();
+				}
+				setConnected(false);
+				console.log("Disconnected");
+			}
+
+			//傳送訊息方法
+			function sendMessage() {
+
+				if ($.trim($("#userName").val()).length == 0) {
+					alert("請輸入名稱，謝謝！");
+				}
+				$("#send").prop("disabled", true);
+				setTimeout(function() {
+					$("#send").prop("disabled", false);
+				}, 500);
+
+				var channel = $("#channel").val();
+				var message = $("#message").val();
+				var userName = $("#userName").val();
+				$("#message").val('');
+				// 				console.log(stompClient);
+				// 			    stompClient.send("/messageControl", {}, JSON.stringify({'message': message}));
+				stompClient.send("/message", {}, JSON.stringify({
+					'channel' : channel,
+					'userName' : userName,
+					'message' : message
+				}));
+			}
+			//顯示接收回來的訊息方法
+			function showConversation(messageObj) {
+				let html = '<tr>'
+						+ '<td>'
+						+ (messageObj.userName == $("#userName").val() ? '<span class="redtext">(自己)</span>'
+								: '') + messageObj.userName + '</td>' + '<td>'
+						+ messageObj.message + "　　　　　　　"
+						+ messageObj.createDate + '</td>' + '</tr>';
+				$("#chatRoom").prepend(html);
+				
+				
+				let notifyConfig = {
+					body : '\\ ^o^ /' // 設定內容
+// 					icon : '/images/favicon.ico' // 設定 icon
+				};
+
+				Notification.requestPermission(function(permission) {
+					if (permission === 'granted') { // 使用者同意授權
+						var notification = new Notification(messageObj.message, notifyConfig); // 建立通知
+					}
+				});
+			}
+
+			//顯示接收回來的訊息方法
+			function showAnnouncement(messageObj) {
+				console.log("公告:" + messageObj.message);
+			}
+
+			$(function() {
+				$("[id^='gist']").remove();
+
+				$("#send").prop("disabled", true);
+
+				$("form").on('submit', function(e) {
+					e.preventDefault();
+				});
+
+				disconnect();
+				$("#connect").click(function() {
+					connect();
+				});
+				$("#disconnect").click(function() {
+					disconnect();
+				});
+				$("#send").click(function() {
+					sendMessage();
+				});
+				$("#clean").click(function() {
+					$("#chatRoom").find("tr").remove()
+				});
+			});
+		</script>
+	</head>
+	<body>
+		<div id="main-content" class="container">
+		    <div class="row">
+		        <div class="col-md-7">
+		            <form class="form-inline">
+		                <div class="form-group">
+		                    <label for="connect">WebSocket 連接頻道(1 or 2):</label>
+		                    <input type="text" id="channel" name="channel" class="form-control" value="1" maxlength="2" min="1" size="3"/>
+		                    <button id="connect" class="btn btn-default" type="submit">連接</button>
+		                    <button id="disconnect" class="btn btn-default" type="submit" disabled="disabled">關閉連接</button>
+		                </div>
+		            </form>
+		        </div>
+		    </div>
+		    <br/>
+		    <div class="row">
+		        <div class="col-md-12">
+		            <form class="form-inline">
+		                <div class="form-group">
+		                    <input type="text" id="userName" name="userName" class="form-control" placeholder="名稱" size="6">
+		                    <input type="text" id="message" name="message" class="form-control" placeholder="訊息" size="30">
+		                </div>
+		                <button id="send" class="btn btn-default" type="submit">發送訊息</button>
+		                <button id="clean" class="btn btn-danger" type="utton">清除訊息</button>
+		            </form>
+		        </div>
+		    </div>
+		    <div class="row">
+		        <div class="col-md-12" id="overflowDiv">
+		            <table id="conversation" class="table table-striped">
+		                <thead>
+		                <tr>
+		                    <th colspan="2">聊天室</th>
+		                </tr>
+		                </thead>
+		                <tbody id="chatRoom">
+		                </tbody>
+		            </table>
+		        </div>
+		    </div>
+		</div>
+
+	</body>
+</html>
